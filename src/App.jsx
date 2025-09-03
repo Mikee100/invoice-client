@@ -5,6 +5,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import CreateInvoice from './pages/CreateInvoice';
+import Invoices from './pages/Invoices';
+import MpesaPaymentPage from './pages/MpesaPaymentPage';
 import Payments from './pages/Payments';
 import Clients from './pages/Clients';
 import Profile from './pages/Profile';
@@ -37,6 +39,8 @@ function App() {
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/create-invoice" element={<CreateInvoice />} />
+                    <Route path="/invoices" element={<Invoices />} />
+                    <Route path="/mpesa-payment/:invoiceId" element={<MpesaPaymentPage />} />
                     <Route path="/payments" element={<Payments />} />
                     <Route path="/clients" element={<Clients />} />
                     <Route path="/profile" element={<Profile />} />

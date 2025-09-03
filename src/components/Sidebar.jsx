@@ -23,6 +23,9 @@ const Sidebar = () => {
             <Link to="/" className="font-semibold hover:text-indigo-600">Dashboard</Link>
           </li>
           <li>
+            <Link to="/invoices" className="hover:text-indigo-600">Invoices</Link>
+          </li>
+          <li>
             <Link to="/create-invoice" className="hover:text-indigo-600">Create Invoice</Link>
           </li>
           <li>

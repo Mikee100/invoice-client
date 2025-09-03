@@ -5,12 +5,15 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
 const CreateInvoice = () => {
+  const [mpesaLinkPreview, setMpesaLinkPreview] = useState('');
   const [invoices, setInvoices] = useState([]);
   const [form, setForm] = useState({
+    project: '',
     businessName: '',
     businessLogo: '',
     clientName: '',
     clientEmail: '',
+    clientPhone: '',
     dueDate: '',
     items: [{ description: '', quantity: 1, price: 0 }],
     footer: '',
@@ -19,7 +22,9 @@ const CreateInvoice = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [sending, setSending] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [invoiceCreated, setInvoiceCreated] = useState(false);
   const user = useSelector(state => state.user.user);
 
   const fetchInvoices = async () => {
@@ -89,30 +94,19 @@ const CreateInvoice = () => {
     setLoading(true);
     setError(null);
     setSuccess(null);
-    
     try {
       const invoiceData = {
         ...form,
         amount: getTotal(),
       };
-      
       if (editId) {
         await api.put(`/invoices/${editId}`, invoiceData);
         setSuccess('Invoice updated successfully!');
       } else {
         await api.post('/invoices', invoiceData);
         setSuccess('Invoice created successfully!');
+        setInvoiceCreated(true);
       }
-      
-      setForm({ 
-        businessName: form.businessName, 
-        businessLogo: form.businessLogo,
-        clientName: '', 
-        clientEmail: '', 
-        dueDate: '', 
-        items: [{ description: '', quantity: 1, price: 0 }],
-        footer: '' 
-      });
       setEditId(null);
       fetchInvoices();
     } catch (err) {
@@ -128,6 +122,7 @@ const CreateInvoice = () => {
       businessLogo: invoice.businessLogo || '',
       clientName: invoice.clientName,
       clientEmail: invoice.clientEmail,
+      clientPhone: invoice.clientPhone || '',
       dueDate: invoice.dueDate?.slice(0, 10),
       items: invoice.items || [{ description: '', quantity: 1, price: 0 }],
       footer: invoice.footer || ''
@@ -162,6 +157,7 @@ const CreateInvoice = () => {
       businessLogo: '', 
       clientName: '', 
       clientEmail: '', 
+      clientPhone: '',
       dueDate: '', 
       items: [{ description: '', quantity: 1, price: 0 }],
       footer: '' 
@@ -169,6 +165,8 @@ const CreateInvoice = () => {
     setEditId(null);
     setSuccess(null);
     setError(null);
+    setMpesaLinkPreview('');
+    setInvoiceCreated(false);
   };
 
   // PDF download handler
@@ -187,6 +185,9 @@ const CreateInvoice = () => {
   const handleSendInvoice = async () => {
     const input = document.getElementById('invoice-preview');
     if (!input) return;
+    setSending(true);
+    setError(null);
+    setSuccess(null);
     try {
       // Generate PDF as base64
       const canvas = await html2canvas(input);
@@ -197,21 +198,30 @@ const CreateInvoice = () => {
       pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
       const pdfBase64 = pdf.output('datauristring'); // returns base64 string
       // Send to backend
-      await api.post('/invoices/send-email', {
+      const res = await api.post('/invoices/send-email', {
         clientEmail: form.clientEmail,
         clientName: form.clientName,
+        clientPhone: form.clientPhone,
         businessName: form.businessName,
+        amount: getTotal(),
         pdfBase64,
       });
-      setSuccess('Invoice sent to client!');
+      if (res.data.mpesaLink) {
+        setMpesaLinkPreview(res.data.mpesaLink);
+      } else {
+        setMpesaLinkPreview('');
+      }
+      setSuccess('Invoice sent successfully to ' + form.clientEmail + '!');
     } catch (err) {
       setError('Failed to send invoice email');
+    } finally {
+      setSending(false);
     }
   };
 
   // Live preview component
   const InvoicePreview = () => (
-    <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '12px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)', width: '100%', display: 'flex', flexDirection: 'column', minHeight: '500px' }} id="invoice-preview">
+  <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '12px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)', width: '100%', display: 'flex', flexDirection: 'column', minHeight: '500px' }} id="invoice-preview">
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #e5e7eb' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
@@ -286,6 +296,7 @@ const CreateInvoice = () => {
       {/* Footer */}
       <div style={{ marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid #e5e7eb' }}>
         <div style={{ color: '#6b7280', fontSize: '14px' }}>{form.footer || 'Thank you for your business!'}</div>
+  {/* Mpesa button removed from preview. Mpesa link will only be shown in the email success message. */}
       </div>
     </div>
   );
@@ -318,13 +329,22 @@ const CreateInvoice = () => {
                 {error}
               </div>
             )}
-            
+            {sending && (
+              <div style={{ marginBottom: '24px', padding: '12px', background: '#e0e7ff', color: '#3730a3', borderRadius: '8px', border: '1px solid #a5b4fc', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <svg className="animate-spin" style={{ height: '24px', width: '24px' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#3730a3" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="#3730a3" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Sending invoice to {form.clientEmail}...
+              </div>
+            )}
             {success && (
               <div style={{ marginBottom: '24px', padding: '12px', background: '#d1fae5', color: '#15803d', borderRadius: '8px', border: '1px solid #6ee7b7' }}>
                 {success}
               </div>
             )}
             
+            {/* Step 1: Fill invoice details */}
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               {/* Business Details */}
               <div style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '24px' }}>
@@ -332,6 +352,17 @@ const CreateInvoice = () => {
                   Business Details
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Project Name</label>
+                    <input
+                      name="project"
+                      value={form.project}
+                      onChange={handleChange}
+                      placeholder="Project Name"
+                      style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
+                      required
+                    />
+                  </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Business Name</label>
                     <input
@@ -398,6 +429,19 @@ const CreateInvoice = () => {
                       style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
                       required
                     />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Client Phone (Mpesa)</label>
+                    <input
+                      name="clientPhone"
+                      value={form.clientPhone}
+                      onChange={handleChange}
+                      placeholder="2547XXXXXXXX"
+                      type="tel"
+                      style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
+                      pattern="2547[0-9]{8}"
+                    />
+                    <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>Required for Mpesa payment link (format: 2547XXXXXXXX)</p>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Due Date</label>
@@ -499,6 +543,7 @@ const CreateInvoice = () => {
                 />
               </div>
               
+              {/* Step 3: Create Invoice button */}
               <button 
                 type="submit" 
                 style={{ background: '#2563eb', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.3s' }}
@@ -527,29 +572,31 @@ const CreateInvoice = () => {
               Invoice Preview
             </h2>
             <InvoicePreview />
-            
-            <div style={{ marginTop: '24px', display: 'flex', gap: '16px' }}>
-              <button
-                type="button"
-                style={{ background: '#111827', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1', transition: 'background 0.3s' }}
-                onClick={handleDownloadPDF}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
-                Download PDF
-              </button>
-              <button
-                type="button"
-                style={{ background: '#22c55e', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1', transition: 'background 0.3s' }}
-                onClick={handleSendInvoice}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                Send Invoice
-              </button>
-            </div>
+            {/* Step 4: Show Download/Send buttons only after invoice is created */}
+            {invoiceCreated && (
+              <div style={{ marginTop: '24px', display: 'flex', gap: '16px' }}>
+                <button
+                  type="button"
+                  style={{ background: '#111827', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1', transition: 'background 0.3s' }}
+                  onClick={handleDownloadPDF}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Download PDF
+                </button>
+                <button
+                  type="button"
+                  style={{ background: '#22c55e', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1', transition: 'background 0.3s' }}
+                  onClick={handleSendInvoice}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Send Invoice
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
