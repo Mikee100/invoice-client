@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Loader from '../components/Loader';
 import { useSelector } from 'react-redux';
 import api from '../services/api';
 import jsPDF from 'jspdf';
@@ -7,6 +8,8 @@ import html2canvas from 'html2canvas';
 const CreateInvoice = () => {
   const [mpesaLinkPreview, setMpesaLinkPreview] = useState('');
   const [invoices, setInvoices] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [clients, setClients] = useState([]);
   const [form, setForm] = useState({
     project: '',
     businessName: '',
@@ -16,7 +19,13 @@ const CreateInvoice = () => {
     clientPhone: '',
     dueDate: '',
     items: [{ description: '', quantity: 1, price: 0 }],
+    currency: 'USD',
     footer: '',
+    paymentMethod: 'mpesa',
+    bankName: '',
+    accountName: '',
+    accountNumber: '',
+    reference: '',
   });
   const fileInputRef = useRef();
   const [loading, setLoading] = useState(false);
@@ -36,12 +45,44 @@ const CreateInvoice = () => {
     }
   };
 
+  const fetchProjects = async () => {
+    try {
+      const res = await api.get('/projects');
+      setProjects(res.data);
+    } catch (err) {
+      // ignore
+    }
+  };
+
+  const fetchClients = async () => {
+    try {
+      const res = await api.get('/clients');
+      setClients(res.data);
+    } catch (err) {
+      // ignore
+    }
+  };
+
   useEffect(() => {
-    fetchInvoices();
+    setLoading(true);
+    Promise.all([fetchInvoices(), fetchProjects(), fetchClients()])
+      .finally(() => setLoading(false));
   }, []);
 
   const handleChange = e => {
     setForm({ ...form, [e.target.name]: e.target.value });
+    if (e.target.name === 'clientId') {
+      const selectedClient = clients.find(c => c._id === e.target.value);
+      if (selectedClient) {
+        setForm(f => ({ ...f, clientName: selectedClient.name, clientEmail: selectedClient.email, clientPhone: selectedClient.phone }));
+      }
+    }
+    if (e.target.name === 'projectId') {
+      const selectedProject = projects.find(p => p._id === e.target.value);
+      if (selectedProject) {
+        setForm(f => ({ ...f, project: selectedProject.name }));
+      }
+    }
   };
 
   const handleLogoUpload = e => {
@@ -107,7 +148,8 @@ const CreateInvoice = () => {
         setSuccess('Invoice created successfully!');
         setInvoiceCreated(true);
       }
-      setEditId(null);
+      // Do NOT reset form or navigate away; keep preview visible
+      // setEditId(null);
       fetchInvoices();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save invoice');
@@ -171,15 +213,47 @@ const CreateInvoice = () => {
 
   // PDF download handler
   const handleDownloadPDF = async () => {
-    const input = document.getElementById('invoice-preview');
-    if (!input) return;
-    const canvas = await html2canvas(input);
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
-    pdf.save(`${form.businessName || 'invoice'}.pdf`);
+  const input = document.getElementById('invoice-preview');
+  if (!input) return;
+  const canvas = await html2canvas(input, {
+    scale: 2,
+    backgroundColor: '#fff',
+    useCORS: true,
+    allowTaint: true,
+    logging: false,
+    width: input.offsetWidth,
+    height: input.offsetHeight
+  });
+  const imgData = canvas.toDataURL('image/png');
+  const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  // Add white margin
+  const margin = 32;
+  // Calculate image size to fit with margin
+  const imgWidth = pageWidth - margin * 2;
+  const imgHeight = canvas.height * (imgWidth / canvas.width);
+  // Center image vertically if shorter than page
+  const yOffset = Math.max(margin, (pageHeight - imgHeight) / 2);
+  pdf.setFillColor(255,255,255);
+  pdf.rect(0, 0, pageWidth, pageHeight, 'F');
+  // Add drop shadow effect (simulate)
+  pdf.setDrawColor(220,220,220);
+  pdf.setLineWidth(2);
+  pdf.rect(margin-2, yOffset-2, imgWidth+4, imgHeight+4);
+  // Add image
+  pdf.addImage(imgData, 'PNG', margin, yOffset, imgWidth, imgHeight);
+  // Add custom font for header
+  pdf.setFont('helvetica', 'bold');
+  pdf.setFontSize(22);
+  pdf.setTextColor(37,99,235);
+  pdf.text(form.businessName || 'Your Business Name', margin+8, margin+28);
+  // Add footer
+  pdf.setFont('helvetica', 'normal');
+  pdf.setFontSize(12);
+  pdf.setTextColor(107,114,128);
+  pdf.text(form.footer || 'Thank you for your business!', margin+8, pageHeight-margin+12);
+  pdf.save(`${form.businessName || 'invoice'}.pdf`);
   };
 
   const handleSendInvoice = async () => {
@@ -190,7 +264,7 @@ const CreateInvoice = () => {
     setSuccess(null);
     try {
       // Generate PDF as base64
-      const canvas = await html2canvas(input);
+  const canvas = await html2canvas(input, { scale: 2 }); // Higher scale for sharper image
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -221,7 +295,31 @@ const CreateInvoice = () => {
 
   // Live preview component
   const InvoicePreview = () => (
-  <div style={{ background: '#f9fafb', padding: '24px', borderRadius: '12px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)', width: '100%', display: 'flex', flexDirection: 'column', minHeight: '500px' }} id="invoice-preview">
+  <div
+    id="invoice-preview"
+    style={{
+      background: '#f9fafb',
+      padding: '24px',
+      borderRadius: '12px',
+      boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '500px',
+      maxWidth: '700px',
+      margin: '0 auto',
+      boxSizing: 'border-box',
+      overflowX: 'auto',
+      fontSize: '16px',
+      '@media print': {
+        boxShadow: 'none',
+        background: '#fff',
+        color: '#000',
+        padding: '0',
+        maxWidth: '100%',
+      },
+    }}
+  >
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #e5e7eb' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
@@ -303,7 +401,7 @@ const CreateInvoice = () => {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
-  <div style={{ display: 'flex', flexDirection: 'row', gap: '32px', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', flexDirection: 'row', gap: '32px', flexWrap: 'wrap' }}>
         {/* Form Section */}
         <div style={{ flex: '1 1 50%', minWidth: '300px' }}>
           <div id="invoice-form" style={{ background: '#fff', padding: '32px', borderRadius: '16px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }}>
@@ -323,12 +421,13 @@ const CreateInvoice = () => {
                 </button>
               )}
             </div>
-            
+            {/* Error Message */}
             {error && (
-              <div style={{ marginBottom: '24px', padding: '12px', background: '#fee2e2', color: '#b91c1c', borderRadius: '8px', border: '1px solid #fca5a5' }}>
+              <div style={{ marginBottom: '24px', padding: '12px', background: '#fee2e2', color: '#b91c1c', borderRadius: '8px', border: '1px solid #fecaca' }}>
                 {error}
               </div>
             )}
+            {/* Sending Message */}
             {sending && (
               <div style={{ marginBottom: '24px', padding: '12px', background: '#e0e7ff', color: '#3730a3', borderRadius: '8px', border: '1px solid #a5b4fc', display: 'flex', alignItems: 'center', gap: '12px' }}>
                 <svg className="animate-spin" style={{ height: '24px', width: '24px' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -338,69 +437,83 @@ const CreateInvoice = () => {
                 Sending invoice to {form.clientEmail}...
               </div>
             )}
+            {/* Success Message */}
             {success && (
               <div style={{ marginBottom: '24px', padding: '12px', background: '#d1fae5', color: '#15803d', borderRadius: '8px', border: '1px solid #6ee7b7' }}>
                 {success}
               </div>
             )}
-            
-            {/* Step 1: Fill invoice details */}
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-              {/* Business Details */}
-              <div style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '24px' }}>
-                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
-                  Business Details
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Project Name</label>
-                    <input
-                      name="project"
-                      value={form.project}
-                      onChange={handleChange}
-                      placeholder="Project Name"
-                      style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Business Name</label>
-                    <input
-                      name="businessName"
-                      value={form.businessName}
-                      onChange={handleChange}
-                      placeholder="Your Business Name"
-                      style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Business Logo</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <div style={{ position: 'relative' }}>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          ref={fileInputRef}
-                          onChange={handleLogoUpload}
-                          style={{ position: 'absolute', inset: '0', width: '100%', height: '100%', opacity: '0', cursor: 'pointer' }}
-                        />
-                        <button 
-                          type="button"
-                          style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', fontWeight: '500', cursor: 'pointer', transition: 'background 0.3s, border-color 0.3s' }}
-                        >
-                          Choose Image
-                        </button>
-                      </div>
-                      {form.businessLogo && (
-                        <img src={form.businessLogo} alt="Logo" style={{ height: '48px', width: '48px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
-                      )}
-                    </div>
-                    <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>JPG, PNG or GIF (Max 2MB)</p>
-                  </div>
-                </div>
+            <form>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Currency</label>
+                <select
+                  name="currency"
+                  value={form.currency}
+                  onChange={handleChange}
+                  style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s', marginBottom: '16px' }}
+                  required
+                >
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="KES">KES - Kenyan Shilling</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="GBP">GBP - British Pound</option>
+                  <option value="NGN">NGN - Nigerian Naira</option>
+                  <option value="INR">INR - Indian Rupee</option>
+                  <option value="ZAR">ZAR - South African Rand</option>
+                </select>
               </div>
-              
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Project</label>
+                <select
+                  name="projectId"
+                  value={form.projectId || ''}
+                  onChange={handleChange}
+                  style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
+                  required
+                >
+                  <option value="">Select Project</option>
+                  {projects.map(project => (
+                    <option key={project._id} value={project._id}>{project.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Business Name</label>
+                <input
+                  name="businessName"
+                  value={form.businessName}
+                  onChange={handleChange}
+                  placeholder="Your Business Name"
+                  style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
+                  required
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Business Logo</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      ref={fileInputRef}
+                      onChange={handleLogoUpload}
+                      style={{ position: 'absolute', inset: '0', width: '100%', height: '100%', opacity: '0', cursor: 'pointer' }}
+                    />
+                    <button 
+                      type="button"
+                      style={{ background: '#fff', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', fontWeight: '500', cursor: 'pointer', transition: 'background 0.3s, border-color 0.3s' }}
+                    >
+                      Choose Image
+                    </button>
+                  </div>
+                  {form.businessLogo && (
+                    <img src={form.businessLogo} alt="Logo" style={{ height: '48px', width: '48px', objectFit: 'contain', borderRadius: '8px', border: '1px solid #e5e7eb' }} />
+                  )}
+                </div>
+                <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>JPG, PNG or GIF (Max 2MB)</p>
+              </div>
+              </form>
+              <form>
               {/* Client Details */}
               <div style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '24px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
@@ -408,15 +521,19 @@ const CreateInvoice = () => {
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Client Name</label>
-                    <input
-                      name="clientName"
-                      value={form.clientName}
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Client</label>
+                    <select
+                      name="clientId"
+                      value={form.clientId || ''}
                       onChange={handleChange}
-                      placeholder="Client Name"
                       style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
                       required
-                    />
+                    >
+                      <option value="">Select Client</option>
+                      {clients.map(client => (
+                        <option key={client._id} value={client._id}>{client.name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Client Email</label>
@@ -455,6 +572,77 @@ const CreateInvoice = () => {
                     />
                   </div>
                 </div>
+              </div>
+              
+              {/* Payment Method */}
+              <div style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '24px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
+                  Payment Method
+                </h3>
+                <select
+                  name="paymentMethod"
+                  value={form.paymentMethod}
+                  onChange={handleChange}
+                  style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s', marginBottom: '16px' }}
+                  required
+                >
+                  <option value="mpesa">Mpesa</option>
+                  <option value="bank">Bank Transfer</option>
+                  <option value="stripe">Stripe (Card/Online)</option>
+                </select>
+                {form.paymentMethod === 'stripe' && (
+                  <div style={{ marginTop: '16px', background: '#f3f4f6', padding: '16px', borderRadius: '8px' }}>
+                    <p className="text-green-700 font-semibold">Stripe is a secure way for your client to pay online using a card or mobile money. The payment link will be sent with the invoice.</p>
+                  </div>
+                )}
+                {form.paymentMethod === 'bank' && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Bank Name</label>
+                      <input
+                        name="bankName"
+                        value={form.bankName}
+                        onChange={handleChange}
+                        placeholder="Bank Name"
+                        style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Account Name</label>
+                      <input
+                        name="accountName"
+                        value={form.accountName}
+                        onChange={handleChange}
+                        placeholder="Account Name"
+                        style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Account Number</label>
+                      <input
+                        name="accountNumber"
+                        value={form.accountNumber}
+                        onChange={handleChange}
+                        placeholder="Account Number"
+                        style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Reference</label>
+                      <input
+                        name="reference"
+                        value={form.reference}
+                        onChange={handleChange}
+                        placeholder="Reference"
+                        style={{ width: '100%', border: '1px solid #d1d5db', borderRadius: '8px', padding: '12px', fontSize: '14px', color: '#374151', outline: 'none', transition: 'border-color 0.3s' }}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               
               {/* Line Items */}
@@ -543,28 +731,10 @@ const CreateInvoice = () => {
                 />
               </div>
               
-              {/* Step 3: Create Invoice button */}
-              <button 
-                type="submit" 
-                style={{ background: '#2563eb', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.3s' }}
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Processing...
-                  </>
-                ) : (
-                  editId ? 'Update Invoice' : 'Create Invoice'
-                )}
-              </button>
+              {/* No submit button. Only live preview is available. */}
             </form>
           </div>
         </div>
-        
         {/* Preview Section */}
         <div style={{ flex: '1 1 50%', minWidth: '300px' }}>
           <div style={{ position: 'sticky', top: '32px' }}>
@@ -572,36 +742,46 @@ const CreateInvoice = () => {
               Invoice Preview
             </h2>
             <InvoicePreview />
-            {/* Step 4: Show Download/Send buttons only after invoice is created */}
-            {invoiceCreated && (
-              <div style={{ marginTop: '24px', display: 'flex', gap: '16px' }}>
-                <button
-                  type="button"
-                  style={{ background: '#111827', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1', transition: 'background 0.3s' }}
-                  onClick={handleDownloadPDF}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Download PDF
-                </button>
-                <button
-                  type="button"
-                  style={{ background: '#22c55e', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1', transition: 'background 0.3s' }}
-                  onClick={handleSendInvoice}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  Send Invoice
-                </button>
-              </div>
-            )}
+            {/* Download PDF button always visible below preview */}
+            <div style={{ marginTop: '24px', display: 'flex', gap: '16px' }}>
+              <button
+                type="button"
+                style={{ background: '#111827', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1', transition: 'background 0.3s' }}
+                onClick={handleDownloadPDF}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download PDF
+              </button>
+              <button
+                type="button"
+                style={{ background: '#2563eb', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1', transition: 'background 0.3s' }}
+                onClick={() => {
+                  navigator.clipboard.writeText(JSON.stringify(form, null, 2));
+                  alert('Invoice data copied as JSON!');
+                }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16h8M8 12h8m-8-4h8M4 6h16M4 20h16" />
+                </svg>
+                Export JSON
+              </button>
+              <button
+                type="button"
+                style={{ background: '#ef4444', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1', transition: 'background 0.3s' }}
+                onClick={resetForm}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Reset
+              </button>
+            </div>
           </div>
-        </div>
       </div>
     </div>
-  );
-};
-
+  </div>
+  
+          )};
 export default CreateInvoice;

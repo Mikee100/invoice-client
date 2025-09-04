@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -12,6 +11,8 @@ import Clients from './pages/Clients';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Projects from './pages/Projects';
+import CreateProject from './pages/CreateProject';
 import { getCurrentUser } from './redux/userSlice';
 
 function PrivateRoute({ children }) {
@@ -43,6 +44,8 @@ function App() {
                     <Route path="/mpesa-payment/:invoiceId" element={<MpesaPaymentPage />} />
                     <Route path="/payments" element={<Payments />} />
                     <Route path="/clients" element={<Clients />} />
+                    <Route path="/projects" element={<Projects />} />
+                    <Route path="/create-project" element={<CreateProject />} />
                     <Route path="/profile" element={<Profile />} />
                   </Routes>
                 </main>
