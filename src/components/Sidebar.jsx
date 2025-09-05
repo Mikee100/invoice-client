@@ -1,13 +1,39 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logoutUser } from '../redux/userSlice';
+import { 
+  FiGrid, 
+  FiFileText, 
+  FiPlusCircle, 
+  FiCreditCard, 
+  FiUsers, 
+  FiBriefcase, 
+  FiUser, 
+  FiLogOut,
+  FiChevronLeft,
+  FiChevronRight
+} from 'react-icons/fi';
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const user = useSelector(state => state.user.user);
+  const location = useLocation();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  const navItems = [
+    { to: '/', icon: <FiGrid size={20} />, label: 'Dashboard' },
+    { to: '/invoices', icon: <FiFileText size={20} />, label: 'Invoices' },
+    { to: '/create-invoice', icon: <FiPlusCircle size={20} />, label: 'Create Invoice' },
+    { to: '/payments', icon: <FiCreditCard size={20} />, label: 'Payments' },
+    { to: '/clients', icon: <FiUsers size={20} />, label: 'Clients' },
+    { to: '/projects', icon: <FiBriefcase size={20} />, label: 'Projects' },
+    { to: '/profile', icon: <FiUser size={20} />, label: 'Profile' },
+  ];
+
+  const isActive = (path) => {
+    return location.pathname === path ? 'bg-indigo-50 text-indigo-600' : 'text-gray-600 hover:bg-gray-50';
+  };
 
   const handleLogout = () => {
     dispatch(logoutUser());
@@ -15,71 +41,65 @@ const Sidebar = () => {
   };
 
   return (
-    <aside className={`h-full bg-gradient-to-b from-indigo-50 to-white shadow-lg border-r border-gray-200 flex flex-col justify-between transition-all duration-300 ${collapsed ? 'w-20' : 'w-64'} min-h-screen`}> 
-      <div>
+    <aside 
+      className={`h-screen bg-white border-r border-gray-100 flex flex-col transition-all duration-300 ease-in-out ${
+        collapsed ? 'w-16' : 'w-56'
+      }`}
+    >
+      {/* Logo / Collapse Button */}
+      <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} h-16 px-4 border-b border-gray-100`}>
+        {!collapsed && (
+          <h1 className="text-xl font-bold text-indigo-600">InvoicePro</h1>
+        )}
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="mt-4 mb-6 ml-2 p-2 rounded-full bg-indigo-100 hover:bg-indigo-200 text-indigo-700 transition flex items-center justify-center"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+          aria-label={collapsed ? 'Expand' : 'Collapse'}
         >
-          {collapsed ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 12h16M10 6l-6 6 6 6" /></svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4m6-6l6 6-6 6" /></svg>
-          )}
+          {collapsed ? <FiChevronRight size={20} /> : <FiChevronLeft size={20} />}
         </button>
-        <ul className={`flex flex-col gap-2 ${collapsed ? 'items-center' : 'items-start'} transition-all`}>
-          <li>
-            <Link to="/" className={`group flex items-center gap-2 font-semibold hover:text-indigo-600 px-3 py-2 rounded-lg transition ${collapsed ? 'justify-center' : ''}`}> 
-              <span className="material-icons" title="Dashboard">dashboard</span> {!collapsed && 'Dashboard'}
-              {collapsed && <span className="absolute left-full ml-2 bg-gray-900 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition">Dashboard</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/invoices" className={`group flex items-center gap-2 hover:text-indigo-600 px-3 py-2 rounded-lg transition ${collapsed ? 'justify-center' : ''}`}> 
-              <span className="material-icons" title="Invoices">receipt_long</span> {!collapsed && 'Invoices'}
-              {collapsed && <span className="absolute left-full ml-2 bg-gray-900 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition">Invoices</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/create-invoice" className={`group flex items-center gap-2 hover:text-indigo-600 px-3 py-2 rounded-lg transition ${collapsed ? 'justify-center' : ''}`}> 
-              <span className="material-icons" title="Create Invoice">add_circle</span> {!collapsed && 'Create Invoice'}
-              {collapsed && <span className="absolute left-full ml-2 bg-gray-900 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition">Create Invoice</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/payments" className={`group flex items-center gap-2 hover:text-indigo-600 px-3 py-2 rounded-lg transition ${collapsed ? 'justify-center' : ''}`}> 
-              <span className="material-icons" title="Payments">credit_card</span> {!collapsed && 'Payments'}
-              {collapsed && <span className="absolute left-full ml-2 bg-gray-900 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition">Payments</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/clients" className={`group flex items-center gap-2 hover:text-indigo-600 px-3 py-2 rounded-lg transition ${collapsed ? 'justify-center' : ''}`}> 
-              <span className="material-icons" title="Clients">groups</span> {!collapsed && 'Clients'}
-              {collapsed && <span className="absolute left-full ml-2 bg-gray-900 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition">Clients</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/projects" className={`group flex items-center gap-2 hover:text-indigo-600 px-3 py-2 rounded-lg transition ${collapsed ? 'justify-center' : ''}`}> 
-              <span className="material-icons" title="Projects">work</span> {!collapsed && 'Projects'}
-              {collapsed && <span className="absolute left-full ml-2 bg-gray-900 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition">Projects</span>}
-            </Link>
-          </li>
-          <li>
-            <Link to="/profile" className={`group flex items-center gap-2 hover:text-indigo-600 px-3 py-2 rounded-lg transition ${collapsed ? 'justify-center' : ''}`}> 
-              <span className="material-icons" title="Profile">person</span> {!collapsed && 'Profile'}
-              {collapsed && <span className="absolute left-full ml-2 bg-gray-900 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition">Profile</span>}
-            </Link>
-          </li>
-        </ul>
       </div>
-      <button
-        onClick={handleLogout}
-        className={`m-4 bg-red-500 text-white py-2 px-4 rounded-lg font-semibold shadow hover:bg-red-600 transition ${collapsed ? 'mx-auto px-2' : ''}`}
-      >
-        {!collapsed && 'Logout'}
-        {collapsed && <span className="material-icons">logout</span>}
-      </button>
+
+      {/* Navigation */}
+      <nav className="flex-1 overflow-y-auto py-4 px-2">
+        <ul className="space-y-1">
+          {navItems.map((item) => (
+            <li key={item.to}>
+              <Link
+                to={item.to}
+                className={`group flex items-center ${
+                  collapsed ? 'justify-center px-2 py-2.5' : 'px-3 py-2.5'
+                } rounded-lg text-sm font-medium ${isActive(item.to)} transition-colors`}
+              >
+                <span className={`${!collapsed ? 'mr-3' : ''}`}>
+                  {React.cloneElement(item.icon, {
+                    className: `flex-shrink-0 ${isActive(item.to).includes('text-indigo-600') ? 'text-indigo-500' : 'text-gray-400 group-hover:text-gray-500'}`
+                  })}
+                </span>
+                {!collapsed && item.label}
+                {collapsed && (
+                  <span className="absolute left-full ml-2 bg-gray-900 text-white text-xs rounded px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+                    {item.label}
+                  </span>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* User & Logout */}
+      <div className={`border-t border-gray-100 p-4 ${collapsed ? 'flex justify-center' : ''}`}>
+        <button
+          onClick={handleLogout}
+          className={`w-full flex items-center ${
+            collapsed ? 'justify-center' : 'justify-between px-3'
+          } py-2 text-sm font-medium text-gray-600 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors`}
+        >
+          <FiLogOut size={18} className={collapsed ? '' : 'mr-2'} />
+          {!collapsed && 'Sign out'}
+        </button>
+      </div>
     </aside>
   );
 };

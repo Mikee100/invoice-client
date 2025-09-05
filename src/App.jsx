@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
 import CreateInvoice from './pages/CreateInvoice';
 import Invoices from './pages/Invoices';
+import InvoiceDetail from './pages/InvoiceDetail';
 import MpesaPaymentPage from './pages/MpesaPaymentPage';
 import Payments from './pages/Payments';
 import Clients from './pages/Clients';
@@ -14,6 +15,7 @@ import Register from './pages/Register';
 import Projects from './pages/Projects';
 import CreateProject from './pages/CreateProject';
 import { getCurrentUser } from './redux/userSlice';
+import ProjectDetails from './pages/ProjectDetails';
 
 function PrivateRoute({ children }) {
   const user = useSelector(state => state.user.user);
@@ -41,10 +43,14 @@ function App() {
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/create-invoice" element={<CreateInvoice />} />
                     <Route path="/invoices" element={<Invoices />} />
+                    <Route path="/invoices/:id" element={<InvoiceDetail />} />
+                    <Route path="/invoices/edit/:id" element={<CreateInvoice />} />
+                    
                     <Route path="/mpesa-payment/:invoiceId" element={<MpesaPaymentPage />} />
                     <Route path="/payments" element={<Payments />} />
                     <Route path="/clients" element={<Clients />} />
                     <Route path="/projects" element={<Projects />} />
+                    <Route path="/projects/:id" element={<ProjectDetails />} />
                     <Route path="/create-project" element={<CreateProject />} />
                     <Route path="/profile" element={<Profile />} />
                   </Routes>

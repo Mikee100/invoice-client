@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Loader from '../components/Loader';
+import { FiPlus, FiTrash2, FiSend, FiDownload, FiEdit2, FiSave } from 'react-icons/fi';
+import Spinner from '../components/ui/Spinner';
 import { useSelector } from 'react-redux';
 import api from '../services/api';
 import jsPDF from 'jspdf';
@@ -429,12 +430,9 @@ const CreateInvoice = () => {
             )}
             {/* Sending Message */}
             {sending && (
-              <div style={{ marginBottom: '24px', padding: '12px', background: '#e0e7ff', color: '#3730a3', borderRadius: '8px', border: '1px solid #a5b4fc', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <svg className="animate-spin" style={{ height: '24px', width: '24px' }} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="#3730a3" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="#3730a3" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Sending invoice to {form.clientEmail}...
+              <div className="mb-6 p-3 bg-indigo-50 text-indigo-800 rounded-lg border border-indigo-200 flex items-center gap-3">
+                <Spinner size="md" color="indigo" />
+                <span>Sending invoice... Please wait.</span>
               </div>
             )}
             {/* Success Message */}

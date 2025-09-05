@@ -1,8 +1,9 @@
 import React from 'react';
+import Spinner from './ui/Spinner';
 
-const Loader = () => (
-  <div className="flex justify-center items-center h-full w-full">
-    <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-indigo-600"></div>
+const Loader = ({ size = 'xl', color = 'indigo', className = '' }) => (
+  <div className={`flex justify-center items-center h-full w-full ${className}`}>
+    <Spinner size={size} color={color} />
   </div>
 );
 
