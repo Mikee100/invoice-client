@@ -1,23 +1,40 @@
-// Tailwind config with safe color palette for html2canvas/jsPDF compatibility
-const legacyColors = require('@tailwindcss/legacy-colors');
-
+// Tailwind config with CSS variables for theming
 module.exports = {
   content: [
     './src/**/*.{js,jsx,ts,tsx}',
     './public/index.html',
   ],
   theme: {
-    colors: legacyColors,
     extend: {
       colors: {
-        primary: '#2563eb',
-        secondary: '#64748b',
-        accent: '#22c55e',
+        primary: {
+          DEFAULT: '#4f46e5',
+          light: '#818cf8',
+          dark: '#4338ca',
+        },
+        secondary: {
+          DEFAULT: '#10b981',
+          light: '#34d399',
+          dark: '#059669',
+        },
+        background: '#ffffff',
+        text: '#1f2937',
+        border: '#e5e7eb',
+        accent: '#3b82f6',
         danger: '#ef4444',
-        warning: '#f59e42',
-        info: '#0ea5e9',
+        warning: '#f59e0b',
+        info: '#3b82f6',
+      },
+      borderRadius: {
+        DEFAULT: 'var(--radius)',
+      },
+      fontFamily: {
+        sans: ['var(--font-sans)', 'sans-serif'],
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+  ],
 };

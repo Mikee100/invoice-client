@@ -26,9 +26,10 @@ const Dashboard = () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await api.get('/auth/dashboard-stats');
-        setStats(res.data);
+        const response = await api.get('/admin/dashboard/stats');
+        setStats(response.data.stats);
       } catch (err) {
+        console.error('Error fetching dashboard stats:', err);
         setError('Failed to fetch dashboard stats');
       } finally {
         setLoading(false);

@@ -1,39 +1,88 @@
-
-
-import React, { useState } from 'react';
-import Loader from '../components/Loader';
-import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-
+import { registerUser, clearError, resetRegistration } from '../redux/userSlice';
+import Loader from '../components/Loader';
+import { toast } from 'react-toastify';
 
 const Register = () => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('freelancer');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'admin', // Default to admin for now
+    companyName: '',
+    phone: ''
+  });
+  
+  const { registration, isAuthenticated, user } = useSelector((state) => state.user);
+  const dispatch = useDispatch();
   const navigate = useNavigate();
+
+  // Clear any previous errors when component mounts
+  useEffect(() => {
+    dispatch(clearError());
+    dispatch(resetRegistration());
+    
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
+
+  // Redirect after successful registration
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // Redirect based on user role
+      const redirectPath = user.role === 'admin' 
+        ? '/admin/dashboard' 
+        : user.role === 'freelancer' 
+          ? '/freelancer/dashboard' 
+          : '/dashboard';
+      
+      toast.success('Registration successful! Redirecting...');
+      navigate(redirectPath);
+    }
+  }, [isAuthenticated, user, navigate]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
+    
+    // Basic form validation
+    if (!formData.name || !formData.email || !formData.password) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    
+    if (formData.password.length < 8) {
+      toast.error('Password must be at least 8 characters long');
+      return;
+    }
+    
     try {
-      await api.post('/auth/register', { name, email, password, role });
-      setSuccess(true);
+      // Dispatch the registerUser action
+      const result = await dispatch(registerUser(formData));
+      
+      if (registerUser.rejected.match(result)) {
+        // Error is already handled by the reducer
+        return;
+      }
+      
+      // If we get here, registration was successful
+      // The useEffect will handle the redirect based on user role
+      
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
-    } finally {
-      setLoading(false);
+      console.error('Registration error:', err);
+      toast.error('An unexpected error occurred. Please try again.');
     }
   };
-
-  if (success) {
-    navigate('/login');
-    return null;
-  }
 
   return (
     <GoogleOAuthProvider clientId="933855646195-52mnjc4vblvvj54uvgl2v2bostedihg4.apps.googleusercontent.com">
@@ -50,54 +99,103 @@ const Register = () => {
             </svg>
             <h2 className="text-2xl font-bold text-indigo-700 tracking-tight">Create Invoice Account</h2>
           </div>
-          {loading && <Loader />}
+          {registration.loading && <Loader />}
+          {registration.error && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+              {registration.error}
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div>
               <label className="block text-sm font-medium text-indigo-700 mb-1">Name</label>
               <input
                 type="text"
-                placeholder="Your Name"
-                value={name}
-                onChange={e => setName(e.target.value)}
+                name="name"
+                placeholder="Full Name"
+                value={formData.name}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 required
-                className="w-full border border-indigo-200 focus:border-indigo-500 p-3 rounded-lg focus:outline-none transition"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-indigo-700 mb-1">Email</label>
               <input
                 type="email"
+                name="email"
                 placeholder="you@email.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 required
-                className="w-full border border-indigo-200 focus:border-indigo-500 p-3 rounded-lg focus:outline-none transition"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-indigo-700 mb-1">Password</label>
               <input
                 type="password"
+                name="password"
                 placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
+                value={formData.password}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 required
-                className="w-full border border-indigo-200 focus:border-indigo-500 p-3 rounded-lg focus:outline-none transition"
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-indigo-700 mb-1">Company Name</label>
+              <input
+                type="text"
+                name="companyName"
+                placeholder="Company Name"
+                value={formData.companyName}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-indigo-700 mb-1">Phone Number</label>
+              <input
+                type="tel"
+                name="phone"
+                placeholder="+254 7XX XXX XXX"
+                value={formData.phone}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                required
+              />
+            </div>
+            <input type="hidden" name="role" value={formData.role} />
+            <div>
               <label className="block text-sm font-medium text-indigo-700 mb-1">Role</label>
               <select
-                value={role}
-                onChange={e => setRole(e.target.value)}
-                className="w-full border border-indigo-200 focus:border-indigo-500 p-3 rounded-lg focus:outline-none transition"
+                value={formData.role}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               >
+                <option value="admin">Admin</option>
                 <option value="freelancer">Freelancer</option>
                 <option value="business">Business</option>
               </select>
             </div>
-            <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold shadow transition" disabled={loading}>
-              {loading ? <Loader /> : 'Sign Up'}
+            <div className="flex items-center">
+              <input
+                id="terms"
+                type="checkbox"
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                required
+              />
+              <label htmlFor="terms" className="ml-2 block text-sm text-gray-700">
+                I agree to the <a href="#" className="text-indigo-600 hover:text-indigo-500">Terms</a> and <a href="#" className="text-indigo-600 hover:text-indigo-500">Privacy Policy</a>
+              </label>
+            </div>
+            <button 
+              type="submit" 
+              className="bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-semibold shadow transition disabled:opacity-70" 
+              disabled={registration.loading}
+            >
+              {registration.loading ? <Loader size="small" /> : 'Create Account'}
             </button>
             {error && <p className="text-red-500 text-center mt-2">{error}</p>}
           </form>

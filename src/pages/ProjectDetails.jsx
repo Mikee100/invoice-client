@@ -24,8 +24,15 @@ const ProjectDetails = () => {
       // If the project has a clientId, fetch client details
       if (projectRes.data.clientId) {
         try {
-          const clientRes = await api.get(`/clients/${projectRes.data.clientId}`);
-          setClient(clientRes.data);
+          // Ensure clientId is a string
+          const clientId = typeof projectRes.data.clientId === 'object' 
+            ? projectRes.data.clientId._id || projectRes.data.clientId.id 
+            : projectRes.data.clientId;
+          
+          if (clientId) {
+            const clientRes = await api.get(`/clients/${clientId}`);
+            setClient(clientRes.data);
+          }
         } catch (err) {
           console.error('Failed to fetch client details:', err);
         }
@@ -172,7 +179,23 @@ const ProjectDetails = () => {
                 <h3 className="text-lg font-medium text-gray-900">Project Image</h3>
               </div>
               <div className="p-4">
-                <img src={project.image} alt={project.name} className="w-full h-auto rounded-lg" />
+                <div className="h-48 md:h-64 w-full overflow-hidden rounded-lg bg-gray-100 flex items-center justify-center">
+                  {project.image?.url ? (
+                    <img 
+                      src={project.image.url} 
+                      alt={project.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.parentElement.innerHTML = (
+                          '<div class="text-center text-gray-500">No image available</div>'
+                        );
+                      }}
+                    />
+                  ) : (
+                    <div className="text-center text-gray-500">No image available</div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -185,11 +208,14 @@ const ProjectDetails = () => {
               </div>
               <div className="p-4">
                 <div className="flex flex-wrap gap-2">
-                  {project.skills.split(',').map((skill, index) => (
-                    <span key={index} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                      {skill.trim()}
-                    </span>
-                  ))}
+                  {Array.isArray(project.skills) 
+                    ? project.skills.map((skill, index) => (
+                        <span key={index} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                          {typeof skill === 'string' ? skill.trim() : skill.name || skill.label || 'Skill'}
+                        </span>
+                      ))
+                    : <span className="text-gray-500">No skills specified</span>
+                  }
                 </div>
               </div>
             </div>

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FiPlus, FiTrash2, FiSend, FiDownload, FiEdit2, FiSave } from 'react-icons/fi';
+import { FiPlus, FiTrash2, FiSend, FiDownload, FiEdit2, FiSave, FiLayers } from 'react-icons/fi';
 import Spinner from '../components/ui/Spinner';
 import { useSelector } from 'react-redux';
 import api from '../services/api';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import TemplateSelector from '../components/TemplateSelector';
+import { TEMPLATES } from '../data/templates'; // <-- Add this line
 
 const CreateInvoice = () => {
   const [mpesaLinkPreview, setMpesaLinkPreview] = useState('');
@@ -27,6 +29,7 @@ const CreateInvoice = () => {
     accountName: '',
     accountNumber: '',
     reference: '',
+    template: 'classic', // Default template
   });
   const fileInputRef = useRef();
   const [loading, setLoading] = useState(false);
@@ -35,6 +38,7 @@ const CreateInvoice = () => {
   const [sending, setSending] = useState(false);
   const [editId, setEditId] = useState(null);
   const [invoiceCreated, setInvoiceCreated] = useState(false);
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false);
   const user = useSelector(state => state.user.user);
 
   const fetchInvoices = async () => {
@@ -295,13 +299,24 @@ const CreateInvoice = () => {
   };
 
   // Live preview component
-  const InvoicePreview = () => (
-  <div
-    id="invoice-preview"
-    style={{
-      background: '#f9fafb',
+  const InvoicePreview = () => {
+    // Get the selected template or fallback to default
+    const selectedTemplate = TEMPLATES.find(t => t.id === form.template) || TEMPLATES[0];
+    const styles = selectedTemplate.styles;
+    
+    // Apply template styles with fallbacks
+    const headerBg = styles.headerBg || styles.primaryColor || '#f9fafb';
+    const headerText = styles.headerText || (headerBg === styles.primaryColor ? '#ffffff' : styles.textColor || '#1f2937');
+    const borderColor = styles.borderColor || '#e5e7eb';
+    const primaryColor = styles.primaryColor || '#2563eb';
+    const secondaryColor = styles.secondaryColor || '#3b82f6';
+
+    const previewStyles = {
+      background: styles.backgroundColor || '#ffffff',
+      color: styles.textColor || '#1f2937',
+      fontFamily: styles.fontFamily || 'Inter, sans-serif',
       padding: '24px',
-      borderRadius: '12px',
+      borderRadius: styles.borderRadius || '12px',
       boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)',
       width: '100%',
       display: 'flex',
@@ -319,10 +334,24 @@ const CreateInvoice = () => {
         padding: '0',
         maxWidth: '100%',
       },
-    }}
-  >
+    };
+    
+    return (
+      <div id="invoice-preview" style={previewStyles}>
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', paddingBottom: '24px', borderBottom: '1px solid #e5e7eb' }}>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'flex-start', 
+        marginBottom: '32px', 
+        paddingBottom: '24px', 
+        borderBottom: `1px solid ${borderColor}`,
+        background: headerBg,
+        color: headerText,
+        padding: '16px 24px',
+        borderRadius: '8px 8px 0 0',
+        margin: '-24px -24px 24px -24px'
+      }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
           {form.businessLogo ? (
             <img src={form.businessLogo} alt="Logo" style={{ height: '64px', width: '64px', objectFit: 'contain', borderRadius: '8px' }} />
@@ -335,7 +364,12 @@ const CreateInvoice = () => {
           )}
           <div>
             <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>{form.businessName || 'Your Business Name'}</h2>
-            <div style={{ color: '#2563eb', fontWeight: '500', marginTop: '4px' }}>INVOICE</div>
+            <div style={{ 
+            color: headerText, 
+            fontWeight: '500', 
+            marginTop: '4px',
+            opacity: 0.9
+          }}>INVOICE</div>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
@@ -387,26 +421,42 @@ const CreateInvoice = () => {
         <div style={{ width: '256px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '12px', paddingBottom: '12px', borderTop: '1px solid #e5e7eb' }}>
             <span style={{ fontWeight: '600', color: '#374151' }}>Total:</span>
-            <span style={{ fontWeight: '700', fontSize: '18px', color: '#2563eb' }}>${getTotal().toFixed(2)}</span>
+            <span style={{ fontWeight: '700', fontSize: '18px', color: primaryColor }}>${getTotal().toFixed(2)}</span>
           </div>
         </div>
       </div>
       
       {/* Footer */}
-      <div style={{ marginTop: 'auto', paddingTop: '24px', borderTop: '1px solid #e5e7eb' }}>
-        <div style={{ color: '#6b7280', fontSize: '14px' }}>{form.footer || 'Thank you for your business!'}</div>
-  {/* Mpesa button removed from preview. Mpesa link will only be shown in the email success message. */}
+      <div style={{ 
+        marginTop: 'auto', 
+        paddingTop: '24px', 
+        borderTop: `1px solid ${borderColor}`,
+        fontSize: '14px',
+        color: styles.textColor ? `${styles.textColor}aa` : '#6b7280'
+      }}>
+        <div>{form.footer || 'Thank you for your business!'}</div>
       </div>
     </div>
   );
+};
 
-  return (
-    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 16px' }}>
-      <div style={{ display: 'flex', flexDirection: 'row', gap: '32px', flexWrap: 'wrap' }}>
+return (
+    <div className="max-w-7xl mx-auto p-4">
+      <div className="flex flex-col lg:flex-row gap-8">
         {/* Form Section */}
-        <div style={{ flex: '1 1 50%', minWidth: '300px' }}>
-          <div id="invoice-form" style={{ background: '#fff', padding: '32px', borderRadius: '16px', boxShadow: '0 4px 8px rgba(0, 0, 0, 0.1)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <div className="flex-1 min-w-0">
+          <div id="invoice-form" className="bg-white p-6 rounded-xl shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Create New Invoice</h2>
+              <button
+                type="button"
+                onClick={() => setShowTemplateSelector(true)}
+                className="flex items-center px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-md text-sm font-medium transition-colors"
+              >
+                <FiLayers className="mr-2" />
+                Change Template
+              </button>
+            </div>
               <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>
                 {editId ? 'Edit Invoice' : 'Create Invoice'}
               </h1>
@@ -771,15 +821,41 @@ const CreateInvoice = () => {
                 onClick={resetForm}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                Reset
+                Clear Form
               </button>
             </div>
           </div>
+        </div>
+        
+        {/* Template Selector Modal */}
+        {showTemplateSelector && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-start justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto mt-16">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">Select a Template</h2>
+                <button
+                  onClick={() => setShowTemplateSelector(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                  aria-label="Close"
+                >
+                  &times;
+                </button>
+              </div>
+              <TemplateSelector
+                onTemplateSelect={(template) => {
+                  setForm(prev => ({ ...prev, template: template.id }));
+                  setShowTemplateSelector(false);
+                }}
+                currentTemplateId={form.template}
+                isPremiumUser={user?.isPremium || false}
+              />
+            </div>
+          </div>
+        )}
       </div>
-    </div>
-  </div>
-  
-          )};
+
+);
+}
 export default CreateInvoice;
