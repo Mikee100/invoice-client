@@ -1,117 +1,136 @@
 import axios from 'axios';
+import { TOKEN_KEY } from '../config';
 import { toast } from 'react-toastify';
 import { store } from '../redux/store';
 import { logoutUser } from '../redux/userSlice';
+import { isTokenExpired, shouldRefreshToken, requestQueue } from '../utils/auth';
 
-// Create axios instance with default config
+// Create axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
-  withCredentials: true, // Send cookies with requests
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api',
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
   },
-  timeout: 10000, // 10 seconds
 });
 
-// Request interceptor to add auth token to requests
+// Add a request interceptor to include the auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem(TOKEN_KEY);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    
-    // Log request in development
-    if (import.meta.env.DEV) {
-      console.log('API Request:', {
-        method: config.method.toUpperCase(),
-        url: config.url,
-        data: config.data,
-        params: config.params,
-      });
-    }
-    
     return config;
   },
   (error) => {
-    if (import.meta.env.DEV) {
-      console.error('API Request Error:', error);
-    }
     return Promise.reject(error);
   }
 );
 
-// Response interceptor for handling common responses
+// Add a response interceptor to handle common errors
 api.interceptors.response.use(
   (response) => {
-    // Log response in development
-    if (import.meta.env.DEV) {
-      console.log('API Response:', {
-        status: response.status,
-        url: response.config.url,
-        data: response.data,
-      });
+    // Check for token in response and update it if present
+    const newToken = response?.headers?.['x-auth-token'] || response?.data?.token;
+    if (newToken) {
+      console.log('Updating token from response');
+      localStorage.setItem(TOKEN_KEY, newToken);
+      api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     }
     return response;
   },
-  async (error) => {
-    const originalRequest = error.config;
+  (error) => {
+    const { response, config } = error;
+    const originalRequest = config;
     
-    // Log error in development
-    if (import.meta.env.DEV) {
-      console.error('API Error:', {
-        status: error.response?.status,
-        url: originalRequest?.url,
-        message: error.message,
-        response: error.response?.data,
-      });
-    }
-
-    // Handle 401 Unauthorized - token expired or invalid
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+    // Handle different error statuses
+    if (response) {
+      const { status, data } = response;
       
-      try {
-        // Try to refresh token if refresh token is available
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (refreshToken) {
-          const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL}/auth/refresh-token`, {
-            refreshToken,
-          });
+      switch (status) {
+        case 401:
+          // If this is a retry or already attempted refresh, don't try again
+          if (originalRequest._retry) {
+            console.log('Already attempted refresh, logging out...');
+            localStorage.removeItem(TOKEN_KEY);
+            store.dispatch(logoutUser());
+            if (!window.location.pathname.includes('/login')) {
+              window.location.href = '/login?session=expired';
+            }
+            return Promise.reject(error);
+          }
           
-          const { token } = response.data;
-          localStorage.setItem('token', token);
+          // Mark this request as having been retried
+          originalRequest._retry = true;
           
-          // Update the Authorization header and retry the original request
-          originalRequest.headers.Authorization = `Bearer ${token}`;
-          return api(originalRequest);
-        } else {
-          // No refresh token available, log out the user
+          // Try to refresh the token first
+          const refreshToken = localStorage.getItem('refresh_token');
+          if (refreshToken) {
+            console.log('Attempting to refresh token...');
+            return api.post('/auth/refresh-token', { refreshToken })
+              .then(({ data }) => {
+                const { token } = data;
+                if (token) {
+                  console.log('Token refreshed successfully');
+                  localStorage.setItem(TOKEN_KEY, token);
+                  api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+                  originalRequest.headers['Authorization'] = `Bearer ${token}`;
+                  return api(originalRequest);
+                }
+                throw new Error('No token in refresh response');
+              })
+              .catch(refreshError => {
+                console.error('Failed to refresh token:', refreshError);
+                localStorage.removeItem(TOKEN_KEY);
+                localStorage.removeItem('refresh_token');
+                store.dispatch(logoutUser());
+                if (!window.location.pathname.includes('/login')) {
+                  window.location.href = '/login?session=expired';
+                }
+                return Promise.reject(refreshError);
+              });
+          }
+          
+          // No refresh token, proceed with normal 401 handling
+          localStorage.removeItem(TOKEN_KEY);
           store.dispatch(logoutUser());
-          window.location.href = '/login';
-        }
-      } catch (refreshError) {
-        // If refresh token fails, log out the user
-        store.dispatch(logoutUser());
-        window.location.href = '/login';
-        return Promise.reject(refreshError);
+          if (!window.location.pathname.includes('/login')) {
+            window.location.href = '/login?session=expired';
+          }
+          break;
+          
+        case 403:
+          // Handle forbidden access
+          toast.error('You do not have permission to perform this action');
+          break;
+          
+        case 404:
+          // Handle not found
+          toast.error('The requested resource was not found');
+          break;
+          
+        case 422:
+          // Handle validation errors
+          if (data.errors) {
+            const errorMessages = Object.values(data.errors).flat();
+            errorMessages.forEach((msg) => toast.error(msg));
+          } else {
+            toast.error('Validation error occurred');
+          }
+          break;
+          
+        case 500:
+          // Handle server errors
+          toast.error('An unexpected error occurred. Please try again later.');
+          break;
+          
+        default:
+          // Handle other errors
+          toast.error(data.message || 'An error occurred');
       }
-    }
-    
-    // Handle other errors
-    const errorMessage = error.response?.data?.message || error.message || 'An error occurred';
-    
-    // Show error toast for non-401 errors
-    if (error.response?.status !== 401) {
-      toast.error(errorMessage, {
-        position: 'top-right',
-        autoClose: 5000,
-        hideProgressBar: false,
-        closeOnClick: true,
-        pauseOnHover: true,
-        draggable: true,
-      });
+    } else {
+      // Handle network errors
+      toast.error('Unable to connect to the server. Please check your internet connection.');
     }
     
     return Promise.reject(error);

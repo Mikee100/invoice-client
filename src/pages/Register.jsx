@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { registerUser, clearError, resetRegistration } from '../redux/userSlice';
 import Loader from '../components/Loader';
 import { toast } from 'react-toastify';
+import { GoogleOAuthProvider,GoogleLogin  } from '@react-oauth/google';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -197,7 +198,8 @@ const Register = () => {
             >
               {registration.loading ? <Loader size="small" /> : 'Create Account'}
             </button>
-            {error && <p className="text-red-500 text-center mt-2">{error}</p>}
+           {registration.error && <p className="text-red-500 text-center mt-2">{registration.error}</p>}
+
           </form>
           <div className="my-6 flex items-center">
             <div className="flex-grow h-px bg-gray-200" />

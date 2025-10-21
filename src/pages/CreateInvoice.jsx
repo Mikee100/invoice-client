@@ -491,7 +491,7 @@ return (
                 {success}
               </div>
             )}
-            <form>
+            <form onSubmit={handleSubmit}>
               <div>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Currency</label>
                 <select
@@ -561,7 +561,6 @@ return (
                 <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '8px' }}>JPG, PNG or GIF (Max 2MB)</p>
               </div>
               </form>
-              <form>
               {/* Client Details */}
               <div style={{ borderBottom: '1px solid #e5e7eb', paddingBottom: '24px' }}>
                 <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1f2937', marginBottom: '16px' }}>
@@ -724,7 +723,7 @@ return (
                           required
                         />
                       </div>
-                      <div style={{ width: '80px' }}>
+                      <div style={{ minWidth: '120px', flexShrink: 0 }}>
                         <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Qty</label>
                         <input
                           type="number"
@@ -735,8 +734,8 @@ return (
                           required
                         />
                       </div>
-                      <div style={{ width: '112px' }}>
-                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Price</label>
+                      <div style={{ minWidth: '140px', flexShrink: 0 }}>
+                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', color: '#374151', marginBottom: '8px' }}>Price ({form.currency})</label>
                         <input
                           type="number"
                           value={item.price}
@@ -747,9 +746,9 @@ return (
                           required
                         />
                       </div>
-                      <div style={{ paddingTop: '24px' }}>
-                        <button 
-                          type="button" 
+                      <div style={{ paddingTop: '24px', flexShrink: 0 }}>
+                        <button
+                          type="button"
                           onClick={() => removeItem(idx)}
                           style={{ color: '#ef4444', cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.3s' }}
                           disabled={form.items.length <= 1}
@@ -780,7 +779,6 @@ return (
               </div>
               
               {/* No submit button. Only live preview is available. */}
-            </form>
           </div>
         </div>
         {/* Preview Section */}
@@ -805,15 +803,12 @@ return (
               <button
                 type="button"
                 style={{ background: '#2563eb', color: '#fff', padding: '12px 24px', borderRadius: '8px', fontWeight: '500', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '1', transition: 'background 0.3s' }}
-                onClick={() => {
-                  navigator.clipboard.writeText(JSON.stringify(form, null, 2));
-                  alert('Invoice data copied as JSON!');
-                }}
+                onClick={handleSubmit}
               >
                 <svg xmlns="http://www.w3.org/2000/svg" style={{ height: '20px', width: '20px', marginRight: '8px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16h8M8 12h8m-8-4h8M4 6h16M4 20h16" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                Export JSON
+                Save Invoice
               </button>
               <button
                 type="button"

@@ -17,13 +17,13 @@ const AdminLayout = () => {
     const checkAuth = async () => {
       try {
         // If we don't have a user but have a token, try to fetch the current user
-        if (!user && localStorage.getItem('token')) {
+        if (!user && localStorage.getItem('invoice_management_token')) {
           await dispatch(getCurrentUser()).unwrap();
         }
       } catch (error) {
         console.error('Auth check failed:', error);
         // Clear any invalid token
-        localStorage.removeItem('token');
+        localStorage.removeItem('invoice_management_token');
         navigate('/login', { state: { from: location } });
       }
     };
@@ -56,7 +56,7 @@ const AdminLayout = () => {
   ];
   
   // Show loading state while checking auth
-  if (loading || (localStorage.getItem('token') && !user)) {
+  if (loading || (localStorage.getItem('invoice_management_token') && !user)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader size="large" />

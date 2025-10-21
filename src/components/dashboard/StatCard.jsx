@@ -2,7 +2,16 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FaArrowUp, FaArrowDown } from 'react-icons/fa';
 
-const StatCard = ({ title, value, change, isPositive, icon, color, loading = false, description = '' }) => {
+const StatCard = ({ 
+  title, 
+  value, 
+  change = '', 
+  isPositive = true, 
+  icon, 
+  color, 
+  loading = false, 
+  description = '' 
+}) => {
   if (loading) {
     return (
       <div className="overflow-hidden bg-white rounded-lg shadow">
@@ -77,13 +86,21 @@ const StatCard = ({ title, value, change, isPositive, icon, color, loading = fal
 };
 
 StatCard.propTypes = {
-  title: PropTypes.string,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  title: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
   change: PropTypes.string,
   isPositive: PropTypes.bool,
-  icon: PropTypes.node,
-  color: PropTypes.string,
+  icon: PropTypes.node.isRequired,
+  color: PropTypes.string.isRequired,
   loading: PropTypes.bool,
+  description: PropTypes.string,
+};
+
+StatCard.defaultProps = {
+  change: '',
+  isPositive: true,
+  loading: false,
+  description: '',
 };
 
 export default StatCard;

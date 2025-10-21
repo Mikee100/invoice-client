@@ -1,15 +1,10 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate, Link } from 'react-router-dom';
-import { loginUser, clearError } from '../redux/userSlice';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { loginUser, clearError, getCurrentUser } from '../redux/userSlice';
 import Loader from '../components/Loader';
 import { toast } from 'react-toastify';
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
-import { setAuthToken } from '../redux/userSlice';
-import api from '../services/api';
-
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -20,28 +15,64 @@ const Login = () => {
   const { loading, error, isAuthenticated, user } = useSelector((state) => state.user);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-
-  // Clear any previous errors when component mounts
+  const [searchParams] = useSearchParams();
+  
+  // Check for expired session
   useEffect(() => {
-    dispatch(clearError());
-    
-    return () => {
-      dispatch(clearError());
-    };
-  }, [dispatch]);
+    if (searchParams.get('session') === 'expired') {
+      toast.info('Your session has expired. Please log in again.');
+      // Clean up the URL
+      navigate('/login', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      const redirectPath = user.role === 'admin' 
-        ? '/admin/dashboard' 
-        : user.role === 'freelancer' 
-          ? '/freelancer/dashboard' 
-          : '/dashboard';
+      console.log('User authenticated, role:', user.role);
+      let redirectPath = '/';
       
-      navigate(redirectPath);
+      if (user.role === 'admin') {
+        redirectPath = '/admin/dashboard';
+      } else if (user.role === 'freelancer') {
+        redirectPath = '/freelancer/dashboard';
+      }
+      
+      console.log('Redirecting to:', redirectPath);
+      navigate(redirectPath, { replace: true });
     }
   }, [isAuthenticated, user, navigate]);
+  
+  // Clear any previous errors when component mounts
+  useEffect(() => {
+    dispatch(clearError());
+    
+    // Clean up any old tokens that might be causing issues
+    const oldToken = localStorage.getItem('token');
+    const currentToken = localStorage.getItem('invoice_management_token');
+    
+    if (oldToken) {
+      console.log('Cleaning up old token');
+      localStorage.removeItem('token');
+    }
+    
+    // If we have a token but no user, try to get the user
+    if (currentToken && !user) {
+      console.log('Found token, fetching user...');
+      dispatch(getCurrentUser())
+        .unwrap()
+        .catch(err => {
+          console.error('Error fetching user:', err);
+          // Clear invalid token
+          localStorage.removeItem('invoice_management_token');
+          delete api.defaults.headers.common['Authorization'];
+        });
+    }
+    
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch, user]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -54,25 +85,30 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Clear any existing errors
+    dispatch(clearError());
+    
     // Basic validation
     if (!formData.email || !formData.password) {
       toast.error('Please fill in all fields');
       return;
     }
     
+    console.log('Attempting login with email:', formData.email);
+    
     try {
       const result = await dispatch(loginUser({
         email: formData.email,
         password: formData.password
-      }));
+      })).unwrap();
       
-      if (loginUser.fulfilled.match(result)) {
-        toast.success('Login successful!');
-        // The useEffect will handle the redirect based on user role
-      }
+      console.log('Login successful, user:', result);
+      
+      // The useEffect will handle the redirection based on user role
+      
     } catch (err) {
-      console.error('Login error:', err);
-      // Error is already handled by the reducer
+      console.error('Login failed:', err);
+      toast.error(err || 'Login failed. Please check your credentials.');
     }
   };
 
@@ -191,11 +227,18 @@ const Login = () => {
               theme="outline"
             />
           </div>
-          <div className="mt-6 text-center text-sm text-gray-500">
-            Don't have an account?{' '}
-            <Link to="/register" className="text-indigo-600 font-medium hover:underline">
-              Create an account
-            </Link>
+          <div className="space-y-2">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{' '}
+              <Link to="/register" className="font-medium text-indigo-600 hover:text-indigo-500">
+                Sign up
+              </Link>
+            </p>
+            <p className="text-sm">
+              <Link to="/forgot-password" className="font-medium text-indigo-600 hover:text-indigo-500">
+                Forgot your password?
+              </Link>
+            </p>
           </div>
         </div>
       </div>

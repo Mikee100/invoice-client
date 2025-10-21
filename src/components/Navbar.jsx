@@ -10,6 +10,7 @@ const Navbar = () => (
       <Link to="/create-invoice" className="hover:text-indigo-600">Create Invoice</Link>
       <Link to="/payments" className="hover:text-indigo-600">Payments</Link>
       <Link to="/clients" className="hover:text-indigo-600">Clients</Link>
+      <Link to="/templates" className="hover:text-indigo-600">Templates</Link>
       <Link to="/profile" className="hover:text-indigo-600">Profile</Link>
     </div>
   </nav>

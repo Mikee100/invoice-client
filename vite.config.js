@@ -1,4 +1,3 @@
-
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -13,7 +12,7 @@ export default defineConfig({
     proxy: {
       // Proxy API requests to the backend server
       '/api': {
-        target: 'http://localhost:5000', // Your backend server URL
+        target: 'http://localhost:8000', // Your backend server URL
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''), // Remove /api prefix when forwarding

@@ -1,34 +1,67 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { FiPlus, FiEdit2, FiTrash2, FiEye, FiFilter } from 'react-icons/fi';
-import { TEMPLATES } from '../../../data/templates';
-
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { FiPlus, FiEdit2, FiTrash2, FiFilter, FiLoader } from 'react-icons/fi';
+import { toast } from 'react-toastify';
+import { getTemplates, deleteTemplate } from '../../../services/templateService';
 
 const TemplateManager = () => {
+  const [templates, setTemplates] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
+  const navigate = useNavigate();
 
-  const filteredTemplates = TEMPLATES.filter(template => {
-    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase());
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      try {
+        const response = await getTemplates();
+        setTemplates(response.data);
+      } catch (error) {
+        console.error('Error fetching templates:', error);
+        toast.error('Failed to load templates');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTemplates();
+  }, []);
+
+  const filteredTemplates = templates.filter(template => {
+    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         template.description?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filter === 'all' || 
-                         (filter === 'free' && !template.isPremium) || 
-                         (filter === 'premium' && template.isPremium);
+                         (filter === 'public' && template.isPublic) || 
+                         (filter === 'private' && !template.isPublic);
     
     return matchesSearch && matchesFilter;
   });
 
-  const handleDelete = (templateId) => {
-    // TODO: Implement delete functionality with confirmation
-    console.log('Deleting template:', templateId);
+  const handleDelete = async (templateId) => {
+    if (window.confirm('Are you sure you want to delete this template? This action cannot be undone.')) {
+      try {
+        await deleteTemplate(templateId);
+        setTemplates(templates.filter(t => t._id !== templateId));
+        toast.success('Template deleted successfully');
+      } catch (error) {
+        console.error('Error deleting template:', error);
+        toast.error('Failed to delete template');
+      }
+    }
   };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Template Manager</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Template Manager</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {loading ? 'Loading templates...' : `Showing ${filteredTemplates.length} of ${templates.length} templates`}
+          </p>
+        </div>
         <Link
           to="/admin/templates/create"
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 mt-4 md:mt-0"
         >
           <FiPlus className="mr-2" />
           Add New Template
@@ -62,8 +95,8 @@ const TemplateManager = () => {
                 onChange={(e) => setFilter(e.target.value)}
               >
                 <option value="all">All Templates</option>
-                <option value="free">Free Templates</option>
-                <option value="premium">Premium Templates</option>
+                <option value="public">Public Templates</option>
+                <option value="private">Private Templates</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
                 <FiFilter className="h-4 w-4" />
@@ -72,76 +105,72 @@ const TemplateManager = () => {
           </div>
         </div>
 
-        {/* Templates Grid */}
-        {filteredTemplates.length > 0 ? (
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <FiLoader className="animate-spin h-8 w-8 text-blue-500" />
+          </div>
+        ) : (
+        /* Templates Grid */
+       
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredTemplates.map((template) => (
-              <div key={template.id} className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
+              <div key={template._id} className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200">
                 <div className="p-4">
                   <div className="flex justify-between items-start">
                     <h3 className="text-lg font-medium text-gray-900">{template.name}</h3>
-                    {template.isPremium && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                        Premium
+                    {!template.isPublic && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        Private
                       </span>
                     )}
                   </div>
-                  <p className="mt-1 text-sm text-gray-500">{template.description}</p>
+                  <p className="mt-1 text-sm text-gray-500 line-clamp-2">{template.description || 'No description'}</p>
                   <div className="mt-4 flex justify-between items-center">
                     <span className="text-sm text-gray-500">
-                      {template.categories.join(', ')}
+                      {template.category}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(template.createdAt).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
-                <div className="bg-gray-50 px-4 py-3 flex justify-end space-x-2">
-                  <Link
-                    to={`/admin/templates/edit/${template.id}`}
-                    className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    <FiEdit2 className="mr-1.5 h-4 w-4" />
-                    Edit
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(template.id)}
-                    className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    <FiTrash2 className="mr-1.5 h-4 w-4" />
-                    Delete
-                  </button>
+                <div className="bg-gray-50 px-4 py-3 flex justify-between">
+                  <div className="flex space-x-2">
+                    {template.tags && template.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {template.tags.slice(0, 2).map((tag, idx) => (
+                          <span key={idx} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            {tag}
+                          </span>
+                        ))}
+                        {template.tags.length > 2 && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">
+                            +{template.tags.length - 2} more
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex space-x-2">
+                    <Link
+                      to={`/admin/templates/edit/${template._id}`}
+                      className="inline-flex items-center px-3 py-1.5 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      <FiEdit2 className="mr-1.5 h-4 w-4" />
+                      Edit
+                    </Link>
+                    <button
+                      onClick={() => handleDelete(template._id)}
+                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm leading-4 font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                    >
+                      <FiTrash2 className="mr-1.5 h-4 w-4" />
+                      Delete
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
-          </div>
-        ) : (
-          <div className="text-center py-12">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No templates found</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {searchTerm ? 'Try adjusting your search or filter to find what you\'re looking for.' : 'Get started by creating a new template.'}
-            </p>
-            <div className="mt-6">
-              <Link
-                to="/admin/templates/create"
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <FiPlus className="-ml-1 mr-2 h-5 w-5" />
-                New Template
-              </Link>
-            </div>
           </div>
         )}
       </div>

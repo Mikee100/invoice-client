@@ -14,7 +14,13 @@ import {
 } from '@heroicons/react/24/outline';
 
 const Dashboard = () => {
-  const [stats, setStats] = React.useState(null);
+  const [stats, setStats] = React.useState({
+    user: { name: 'User', role: 'User' },
+    invoices: { total: 0, amount: 0, paid: 0, unpaid: 0, recent: [] },
+    payments: { total: 0, amount: 0, recent: [] },
+    clients: { total: 0, recent: [] },
+    projects: { total: 0, recent: [] }
+  });
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
   const [report, setReport] = React.useState('');
@@ -26,11 +32,15 @@ const Dashboard = () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get('/admin/dashboard/stats');
-        setStats(response.data.stats);
+        const res = await api.get('/auth/dashboard-stats');
+        setStats(prev => ({
+          ...prev,
+          ...res.data,
+          user: res.data.user || { name: 'User', role: 'User' }
+        }));
       } catch (err) {
-        console.error('Error fetching dashboard stats:', err);
         setError('Failed to fetch dashboard stats');
+        console.error('Error fetching dashboard stats:', err);
       } finally {
         setLoading(false);
       }
@@ -47,16 +57,21 @@ const Dashboard = () => {
       setReport(res.data.report);
     } catch (err) {
       setError('Failed to fetch AI report');
+      console.error('Error fetching AI report:', err);
     } finally {
       setAiLoading(false);
     }
   };
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Loader />
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader />
+      </div>
+    );
+  }
+
+  const { user, invoices, payments, clients, projects } = stats;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -66,8 +81,8 @@ const Dashboard = () => {
           <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
           <div className="flex items-center space-x-4">
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">{stats.user?.name || 'User'}</p>
-              <p className="text-xs text-gray-500">{stats.user?.role}</p>
+              <p className="text-sm font-medium text-gray-900">{user?.name || 'User'}</p>
+              <p className="text-xs text-gray-500">{user?.role || 'User'}</p>
             </div>
             <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
               <UserIcon className="h-6 w-6 text-indigo-600" />
@@ -97,179 +112,188 @@ const Dashboard = () => {
         <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-6 mb-8 text-white">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
             <div>
-              <h2 className="text-2xl font-bold mb-2">Welcome back, {stats.user?.name || 'User'}!</h2>
+              <h2 className="text-2xl font-bold mb-2">Welcome back, {user?.name || 'User'}!</h2>
               <p className="opacity-90">Here's what's happening with your business today.</p>
             </div>
             <button
               onClick={fetchAIReport}
-              className="mt-4 md:mt-0 flex items-center bg-white text-indigo-600 font-medium py-2 px-4 rounded-lg shadow hover:bg-gray-100 transition-colors"
               disabled={aiLoading}
+              className="mt-4 md:mt-0 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-white hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
-              {aiLoading ? (
-                <Loader size="small" />
-              ) : (
+              {aiLoading ? 'Generating...' : (
                 <>
-                  <SparklesIcon className="h-5 w-5 mr-2" />
-                  AI Insights
+                  <SparklesIcon className="-ml-1 mr-2 h-5 w-5" />
+                  Generate AI Report
                 </>
               )}
             </button>
           </div>
+          {report && (
+            <div className="mt-4 p-4 bg-white bg-opacity-10 rounded-lg">
+              <p className="text-sm">{report}</p>
+            </div>
+          )}
         </div>
 
-        {stats && (
-          <>
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-lg bg-indigo-100">
-                    <DocumentTextIcon className="h-6 w-6 text-indigo-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Invoices</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.invoices.total}</p>
-                  </div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-8">
+          {/* Invoices Card */}
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-indigo-500 rounded-md p-3">
+                  <DocumentTextIcon className="h-6 w-6 text-white" />
                 </div>
-                <div className="mt-4 flex items-center text-sm">
-                  <div className="flex-1">
-                    <p className="text-gray-500">Total Amount</p>
-                    <p className="font-medium">${stats.invoices.amount}</p>
-                  </div>
-                  <div className="text-right">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${stats.invoices.paid > stats.invoices.unpaid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                      {stats.invoices.paid > stats.invoices.unpaid ? (
-                        <ArrowTrendingUpIcon className="h-4 w-4 mr-1" />
-                      ) : (
-                        <ArrowTrendingDownIcon className="h-4 w-4 mr-1" />
-                      )}
-                      {Math.round((stats.invoices.paid / stats.invoices.total) * 100)}% Paid
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-lg bg-green-100">
-                    <CreditCardIcon className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Payments</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.payments.total}</p>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-sm text-gray-500">Total Processed</p>
-                  <p className="font-medium">${stats.payments.amount}</p>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-lg bg-blue-100">
-                    <UserIcon className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Clients</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.clients.total}</p>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-sm text-gray-500">Active</p>
-                  <p className="font-medium">{stats.clients.total} Clients</p>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 hover:shadow-md transition-shadow">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-lg bg-purple-100">
-                    <BriefcaseIcon className="h-6 w-6 text-purple-600" />
-                  </div>
-                  <div className="ml-4">
-                    <p className="text-sm font-medium text-gray-600">Projects</p>
-                    <p className="text-2xl font-semibold text-gray-900">{stats.projects.total}</p>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-sm text-gray-500">Active</p>
-                  <p className="font-medium">{stats.projects.total} Projects</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Chart Section */}
-            <div className="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-100">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-lg font-semibold text-gray-900">Income Analytics</h2>
-                <div className="flex space-x-2">
-                  <button className={`px-3 py-1 text-sm rounded-lg ${activeTab === 'overview' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`} onClick={() => setActiveTab('overview')}>
-                    Overview
-                  </button>
-                  <button className={`px-3 py-1 text-sm rounded-lg ${activeTab === 'detailed' ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'}`} onClick={() => setActiveTab('detailed')}>
-                    Detailed
-                  </button>
-                </div>
-              </div>
-              <PaymentChart 
-                data={stats.invoices.recent.map(inv => ({
-                  month: new Date(inv.createdAt).toLocaleString('default', { month: 'short', year: 'numeric' }),
-                  amount: inv.amount
-                }))} 
-              />
-            </div>
-
-            {/* AI Report Section */}
-            {report && (
-              <div className="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-100">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                  <SparklesIcon className="h-5 w-5 text-yellow-500 mr-2" />
-                  AI Insights
-                </h2>
-                <div className="prose prose-sm max-w-none text-gray-700">
-                  {report}
-                </div>
-              </div>
-            )}
-
-            {/* Recent Activity Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Recent Invoices */}
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Invoices</h2>
-                <div className="space-y-4">
-                  {stats.invoices.recent.slice(0, 5).map(inv => (
-                    <InvoiceCard key={inv._id} invoice={inv} />
-                  ))}
-                </div>
-                <button className="mt-4 w-full text-center text-indigo-600 hover:text-indigo-800 text-sm font-medium py-2">
-                  View all invoices →
-                </button>
-              </div>
-
-              {/* Recent Payments */}
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Payments</h2>
-                <div className="divide-y divide-gray-200">
-                  {stats.payments.recent.slice(0, 5).map(pay => (
-                    <div key={pay._id} className="py-3 first:pt-0 last:pb-0">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-gray-900">${pay.amountPaid}</p>
-                          <p className="text-sm text-gray-500">Invoice #{pay.invoiceId}</p>
-                        </div>
-                        <span className="text-sm text-gray-500">{new Date(pay.createdAt).toLocaleDateString()}</span>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Invoices</dt>
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-gray-900">
+                        {invoices?.total?.toLocaleString() || '0'}
                       </div>
-                    </div>
-                  ))}
+                      <div className="ml-2 flex items-baseline text-sm font-semibold text-green-600">
+                        <ArrowTrendingUpIcon className="h-4 w-4" />
+                        <span className="sr-only">Increased by</span>
+                        12%
+                      </div>
+                    </dd>
+                  </dl>
                 </div>
-                <button className="mt-4 w-full text-center text-indigo-600 hover:text-indigo-800 text-sm font-medium py-2">
-                  View all payments →
-                </button>
               </div>
             </div>
-          </>
-        )}
+            <div className="bg-gray-50 px-5 py-3">
+              <div className="text-sm">
+                <a href="/invoices" className="font-medium text-indigo-600 hover:text-indigo-500">
+                  View all
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Payments Card */}
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
+                  <CreditCardIcon className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Revenue</dt>
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-gray-900">
+                        ${payments?.amount?.toLocaleString() || '0'}
+                      </div>
+                      <div className="ml-2 flex items-baseline text-sm font-semibold text-green-600">
+                        <ArrowTrendingUpIcon className="h-4 w-4" />
+                        <span className="sr-only">Increased by</span>
+                        8.2%
+                      </div>
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-5 py-3">
+              <div className="text-sm">
+                <a href="/payments" className="font-medium text-indigo-600 hover:text-indigo-500">
+                  View all
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Clients Card */}
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-yellow-500 rounded-md p-3">
+                  <UserIcon className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Total Clients</dt>
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-gray-900">
+                        {clients?.total?.toLocaleString() || '0'}
+                      </div>
+                      <div className="ml-2 flex items-baseline text-sm font-semibold text-green-600">
+                        <ArrowTrendingUpIcon className="h-4 w-4" />
+                        <span className="sr-only">Increased by</span>
+                        5.4%
+                      </div>
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-5 py-3">
+              <div className="text-sm">
+                <a href="/clients" className="font-medium text-indigo-600 hover:text-indigo-500">
+                  View all
+                </a>
+              </div>
+            </div>
+          </div>
+
+          {/* Projects Card */}
+          <div className="bg-white overflow-hidden shadow rounded-lg">
+            <div className="p-5">
+              <div className="flex items-center">
+                <div className="flex-shrink-0 bg-red-500 rounded-md p-3">
+                  <BriefcaseIcon className="h-6 w-6 text-white" />
+                </div>
+                <div className="ml-5 w-0 flex-1">
+                  <dl>
+                    <dt className="text-sm font-medium text-gray-500 truncate">Active Projects</dt>
+                    <dd className="flex items-baseline">
+                      <div className="text-2xl font-semibold text-gray-900">
+                        {projects?.total?.toLocaleString() || '0'}
+                      </div>
+                      <div className="ml-2 flex items-baseline text-sm font-semibold text-red-600">
+                        <ArrowTrendingDownIcon className="h-4 w-4" />
+                        <span className="sr-only">Decreased by</span>
+                        3.2%
+                      </div>
+                    </dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-5 py-3">
+              <div className="text-sm">
+                <a href="/projects" className="font-medium text-indigo-600 hover:text-indigo-500">
+                  View all
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts and Recent Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          {/* Payment Chart */}
+          <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Revenue Overview</h3>
+            <div className="h-80">
+              <PaymentChart />
+            </div>
+          </div>
+
+          {/* Recent Activity */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Invoices</h3>
+            <div className="space-y-4">
+              {invoices?.recent?.length > 0 ? (
+                invoices.recent.map((invoice) => (
+                  <InvoiceCard key={invoice._id} invoice={invoice} />
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">No recent invoices</p>
+              )}
+            </div>
+          </div>
+        </div>
       </main>
     </div>
   );

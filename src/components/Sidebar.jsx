@@ -28,7 +28,8 @@ const Sidebar = () => {
   const mainNavItems = [
     { to: '/', icon: <FiGrid size={20} />, label: 'Dashboard' },
     { to: '/invoices', icon: <FiFileText size={20} />, label: 'Invoices' },
-    { to: '/create-invoice', icon: <FiPlusCircle size={20} />, label: 'Create Invoice' },
+    { to: '/invoices/recurring', icon: <FiFileText size={20} />, label: 'Recurring Invoices' },
+    { to: '/invoices/new', icon: <FiPlusCircle size={20} />, label: 'Create Invoice' },
     { to: '/payments', icon: <FiCreditCard size={20} />, label: 'Payments' },
     { to: '/clients', icon: <FiUsers size={20} />, label: 'Clients' },
     { to: '/projects', icon: <FiBriefcase size={20} />, label: 'Projects' },
